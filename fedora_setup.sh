@@ -1,3 +1,21 @@
+#!/usr/bin/env bash
+# Run with sudo from your desktop session.
+
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run this script with sudo." >&2
+    exit 1
+fi
+
+# The user who invoked sudo (gsettings changes apply to them, not root)
+ACTUAL_USER=${SUDO_USER:?Run with sudo from a regular user account}
+ACTUAL_UID=$(id -u "$ACTUAL_USER")
+
+# gsettings needs the user's session D-Bus when run via sudo
+user_gsettings() {
+    sudo -u "$ACTUAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$ACTUAL_UID/bus" gsettings "$@"
+}
+
+
 # System Upgrade
 dnf upgrade -y
 
@@ -44,12 +62,12 @@ dnf swap mesa-vdpau-drivers mesa-vdpau-drivers-freeworld -y
 dnf install -y @virtualization
 
 # Configure power settings to prevent system sleep and hibernation
-sudo -u $ACTUAL_USER gsettings set org.gnome.desktop.session idle-delay 0
-sudo -u $ACTUAL_USER gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
-sudo -u $ACTUAL_USER gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
-sudo -u $ACTUAL_USER gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
-sudo -u $ACTUAL_USER gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
-sudo -u $ACTUAL_USER gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'suspend'
+user_gsettings set org.gnome.desktop.session idle-delay 0
+user_gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+user_gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
+user_gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+user_gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+user_gsettings set org.gnome.settings-daemon.plugins.power power-button-action 'suspend'
 
 # Update all Flatpak applications alongside the system upgrade (Flatpak apps are not touched by dnf upgrade)
 if command -v flatpak &>/dev/null; then
@@ -96,11 +114,10 @@ flatpak install -y flathub com.usebottles.bottles
 # Customization
 # A flat colorful design icon theme for linux desktops
 dnf install -y papirus-icon-theme
-sudo -u $ACTUAL_USER gsettings set org.gnome.desktop.interface icon-theme "Papirus"
+user_gsettings set org.gnome.desktop.interface icon-theme "Papirus"
 
 
 # Custom Script
 # Custom user-defined commands
 
 
-(...)  # Script footer
